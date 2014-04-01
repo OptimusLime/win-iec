@@ -4,5 +4,16 @@
   "scripts": [
     "lib/win-iec.js"
   ],
-  "main": "lib/win-iec.js"
+  "main": "lib/win-iec.js",
+   "remotes": [
+    "https://raw.github.com",
+    "https://raw.githubusercontent.com"
+  ],
+  "development" : {
+  	"techjacker/q" : "*",
+  	"optimuslime/win-backbone" : "*",
+  	"optimuslime/win-schema" : "*",
+  	"optimuslime/win-utils" : "*",
+  	"optimuslime/win-gen" : "*"
+  }
 }

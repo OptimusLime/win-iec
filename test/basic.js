@@ -123,7 +123,7 @@ var qBackboneResponse = function()
     return defer.promise;
 }
 
-describe('Testing win-iec for: ',function(){
+describe('Testing win-iec for: ', function(){
 
     //we need to start up the WIN backend
     before(function(done){
@@ -251,22 +251,25 @@ describe('Testing win-iec for: ',function(){
             {
                 // backLog('\tFinished creating neat genoems: '.cyan, util.inspect(evoObjects, false,10));
                 //check our evo objects
-                evoObjects.length.should.equal(idList.length);
 
+                var iCount = 0;
                 var chosen = seeds[chosenParent];
                 backLog("Chosen: ", chosen);
-                for(var i=0; i < evoObjects.length; i++)
+                for(var key in evoObjects)
                 {
+                    iCount++;
                     //go through evo objects duh
                     //should be the children of the chosen parent!
-                    evoObjects[i].parents[0].should.equal(chosen.wid);
+                    evoObjects[key].parents[0].should.equal(chosen.wid);
                 }
+
+                iCount.should.equal(idList.length);
 
                 done();
     		})
     		.fail(function(err)
     		{
-    			backLog("Failure: ", util.inspect(err.errors, false,10));
+    			backLog("Failure: ", util.inspect(err, false,10));
 
     			if(err.errno)
     				done(err);
