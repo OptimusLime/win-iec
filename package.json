@@ -2,5 +2,15 @@
   "name": "win-iec",
   "version": "0.0.1",
   "main": "lib/win-iec.js",
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies" : {
+  	"mocha" :"*",
+  	"should" :"*",
+  	"q" :"*",
+  	"colors" :"*",
+  	"win-backbone" : "*",
+  	"win-schema" : "*",
+  	"win-utils" : "*", 
+  	"win-gen" : "*"
+  }
 }
