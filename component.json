@@ -1,0 +1,8 @@
+{
+  "name": "win-iec",
+  "version": "0.0.1",
+  "scripts": [
+    "lib/win-iec.js"
+  ],
+  "main": "lib/win-iec.js"
+}
