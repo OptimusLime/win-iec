@@ -21,6 +21,8 @@ var emptyModule =
 	eventCallbacks : function(){ return {}; },
 	requiredEvents : function() {
 		return [
+        "evolution:resetEvolution",
+        "evolution:publishArtifact",
         "evolution:loadSeeds",
         "evolution:getOrCreateOffspring",
         "evolution:selectParents",
@@ -87,6 +89,106 @@ var sampleModule =
     }
 };
 
+var refSchema = 
+{
+    innerArray : { type: "array", "$ref": "sample"},
+    justRef : {"$ref": "sample"},
+    prop : "string"
+}
+
+var sampleRefModule  = 
+{
+    winFunction : "encoding",
+    eventCallbacks : function(){ return {
+       "encoding:sampleref-createFullOffspring" : function(genProps, parentProps, override, done) { 
+                // backLog('called create full offspring ', override ? override.forceParents : ""); 
+                var parents = parentProps.parents;
+                var count = genProps.count;
+
+                var allParents = [];
+                var children = [];
+
+                var convertString = function(str,c)
+                {
+                    return str.split("-")[0] + "-" + cIx + "-" + c;
+                }
+
+                for(var c=0; c < count; c++)
+                {
+                    var ixs = [];
+                    var pIx = wMath.next(parents.length);
+                    var rOffspring = JSON.parse(JSON.stringify(parents[pIx]));  
+
+
+                    rOffspring.wid = convertString(rOffspring.wid, c);
+                    var iArray = rOffspring.innerArray;
+                    for(var a=0; a < iArray.length; a++){
+                        iArray[a].wid = convertString(iArray[a].wid, c);
+                        iArray[a].sample = convertString(iArray[a].sample, c);
+                        //pull parent wids from the parent object we copied
+                        iArray[a].parents = [parents[pIx].innerArray[a].wid];
+                    }
+
+                    //convert the wid and inside sample prop
+                    rOffspring.justRef.wid = convertString(rOffspring.justRef.wid, c);
+                    rOffspring.justRef.sample = convertString(rOffspring.justRef.sample, c);
+
+                    //pull parent info for internal references -- WIN doesn't handle internal references if you use createfulloffspring
+                    rOffspring.justRef.parents = [parents[pIx].justRef.wid];
+
+                    rOffspring.prop = convertString(rOffspring.prop, c);
+                    // rOffspring.second = "This will be erased.";
+
+                    ixs.push(pIx);
+                    children.push(rOffspring);
+                    allParents.push(ixs);
+                }
+
+                cIx++;
+                //done, send er back
+                done(undefined, children, allParents);
+
+                return; 
+             }
+
+        }; 
+    },
+    requiredEvents : function() {
+        return [
+            "schema:addSchema"
+            ];
+    },
+    initialize : function(done)
+    {
+       var emit = backbone.getEmitter(sampleRefModule);
+       emit("schema:addSchema", "sampleref", refSchema, function(err)
+       {
+            if(err)
+                done(err);
+            else
+                done();
+       });
+    }
+};
+
+var publishModule = 
+{
+    winFunction : "publish",
+    eventCallbacks : function(){ return {
+       "publish:publishArtifacts" : function(genomeType, session, artifactList, privateList, finished) { 
+                //don't do anything, just successfully save!
+                setTimeout(function(){
+                    finished();
+                },0);
+            }
+        }
+    },
+    requiredEvents : function() {
+        return [
+            ];
+    }
+};
+
 var qBackboneResponse = function()
 {
     var defer = Q.defer();
@@ -138,6 +240,8 @@ describe('Testing win-iec for: ', function(){
 			"win-gen" : "win-gen",
 			"win-schema" : "win-schema",
             "sample-encoding" : sampleModule,
+            "sampleref-encoding" : sampleRefModule,
+            "publish" : publishModule,
 			"test" : emptyModule
 		};
 		var configurations = 
@@ -155,15 +259,16 @@ describe('Testing win-iec for: ', function(){
 			},
 			"win-gen" : {
 				"encodings" : [
-					"sample"
+					"sample",
+                    "sampleref"
 				]
 				,validateParents : true
 				,validateOffspring : true
-				,logLevel : backbone.testing
+				// ,logLevel : backbone.testing
 			},
 			"win-schema" : {
 				multipleErrors : true
-				// ,logLevel : backbone.testing
+				,logLevel : backbone.testing
 			}
 		};
 
@@ -205,6 +310,92 @@ describe('Testing win-iec for: ', function(){
 
                 done();
             })
+    });
+
+     it('check seed logic works -- save the children' ,function(done){
+
+        //one of the issues is if the internal references have the same wids -- as might be the case for seeds
+        var sampleSeed = {wid: "sampleSeed", dbType: "sample", parents :[], sample: "fun"};
+        var sampleArraySeed = {wid: "sampleArraySeed", dbType: "sample", parents :[], sample: "funarray"};
+        var refSeed = {wid: "refSeed", dbType:"sampleref", parents:[], innerArray: [sampleArraySeed], justRef: sampleSeed, prop: "boogywoogy"}
+
+        var seeds = {"0" : refSeed};
+
+        backEmit("evolution:resetEvolution", "sampleref");
+
+        backEmit("evolution:loadSeeds", seeds);
+
+        var genOff = 10;
+
+        var l2Publish, l2wid;
+
+        var chosenParent = "0"
+
+
+        //select the first object
+         qBackboneResponse("evolution:selectParents", chosenParent)
+            .then(function()
+            {
+                var list = [];
+                for(var i=0; i < genOff; i++)
+                    list.push("" + i);
+
+                return qBackboneResponse("evolution:getOrCreateOffspring", list)
+            })
+            .then(function(offspring)
+            {
+                var rSelect = "" + wMath.next(genOff);
+
+                //remove the original parent
+                backEmit("evolution:unselectParents", chosenParent);
+
+                //now add a new parent
+                return qBackboneResponse("evolution:selectParents", [rSelect]);
+            })
+            .then(function(){
+
+                //now we've chosen a different parent, we create more individuals
+                //these individuals are removed from the original seed
+
+                //therefore, we can test our pulish logic on them
+                //we have offspring, now make offspring from one of those offspring objects
+                var l2 = [];
+                for(var i= genOff; i < 2*genOff; i++)
+                    l2.push(""+i);
+
+                l2Publish = "" + (genOff + wMath.next(genOff));
+
+                return qBackboneResponse("evolution:getOrCreateOffspring", l2)
+            })
+            .then(function(offspring){
+
+                //now we're ready to test publish (auto succeeds)
+                // backLog("Created: ".red, offspring)
+                // backLog("\n\n selecting: ".green, l2Publish);
+
+                l2wid = offspring[l2Publish].wid;
+
+                return qBackboneResponse("evolution:publishArtifact", l2Publish);
+            })
+            .then(function(publishedArtifact)
+            {
+
+                var singleObject = publishedArtifact[l2wid];
+                backLog("\n\nPubbed: ".cyan, singleObject);
+
+                var cp = seeds[chosenParent];
+                //now let us test the published artifact
+                singleObject.parents.join('').should.equal(cp.wid)
+                singleObject.justRef.parents.join('').should.equal(cp.justRef.wid)
+                singleObject.innerArray[0].parents.join('').should.equal(cp.innerArray[0].wid)
+
+                done();
+            })
+            .fail(function(err)
+            {
+                backLog("\n\n\n\n\nError: ".red ,err.stack );
+                done(new Error(err));
+            })
 
 
     });
@@ -236,6 +427,9 @@ describe('Testing win-iec for: ', function(){
     	//after the creation step
     	// var session = {};
 
+        //reest everything please
+        backEmit("evolution:resetEvolution", "sample");
+
     	//now we call asking for loading of seeds -- synchronous -- happens immediately (no callback)
         backEmit("evolution:loadSeeds", seeds);
 
@@ -254,7 +448,7 @@ describe('Testing win-iec for: ', function(){
 
                 var iCount = 0;
                 var chosen = seeds[chosenParent];
-                backLog("Chosen: ", chosen);
+                // backLog("Chosen: ", evoObjects);
                 for(var key in evoObjects)
                 {
                     iCount++;
@@ -264,6 +458,7 @@ describe('Testing win-iec for: ', function(){
                 }
 
                 iCount.should.equal(idList.length);
+
 
                 done();
     		})
