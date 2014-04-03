@@ -1,6 +1,5 @@
 {
   "name": "win-iec",
-  "version": "0.0.2",
-  "main": "lib/win-iec.js",
-  "dependencies": {}
+  "version": "0.0.2-1",
+  "main": "lib/win-iec.js"
 }
