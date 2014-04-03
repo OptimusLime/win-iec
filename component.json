@@ -1,8 +1,15 @@
 {
   "name": "win-iec",
-  "version": "0.0.2-3",
+  "version": "0.0.2-4",
   "main": "lib/win-iec.js",
   "scripts" : [
     "lib/win-iec.js" 
-  ]
+  ],
+   "remotes": [
+    "https://raw.github.com",
+    "https://raw.githubusercontent.com"
+  ],
+  "dependencies" : {
+    "optimuslime/win-utils" : "*"
+   }
 }
